@@ -1,0 +1,70 @@
+version: "3"
+
+services:
+  sedra_explorer:
+    container_name: sedra_explorer
+    image: sedracoin/sedra-explorer:latest
+    restart: unless-stopped
+    environment:
+      API_URI: "http://localhost:8000"
+      API_WS_URI: "ws://localhost:8000"
+    ports:
+      - "8080:8080/tcp"
+
+  sedra_rest_server:
+    container_name: sedra_rest_server
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.dev
+    restart: unless-stopped
+    command: pipenv run uvicorn main:app --reload --host 0.0.0.0 --port 8000 
+    volumes:
+      - "../:/app"
+    environment:
+      SEDRAD_HOST_1: sedrad:22110
+      SQL_URI: postgresql+asyncpg://postgres:postgres@postgresql:5432/postgres
+    ports:
+      - "8000:8000/tcp"
+    links:
+      - sedrad
+      - postgresql
+
+  sedra_db_filler:
+    container_name: sedra_db_filler
+    image: sedracoin/sedra-db-filler:latest
+    restart: unless-stopped
+    environment:
+      DEBUG: "true"
+      SEDRAD_HOST_1: sedrad:22110
+      SQL_URI: postgresql://postgres:postgres@postgresql:5432/postgres
+    links:
+      - sedrad
+      - postgresql
+
+  postgresql:
+    container_name: postgresql
+    image: postgres:14-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432/tcp"
+    volumes:
+      - postgresql:/var/lib/postgresql/data/
+
+  sedrad:
+    container_name: sedrad
+    image: sedracoin/sedrad:latest
+    restart: unless-stopped
+    ports:
+      - "22110:22110/tcp"
+      - "22111:22111/tcp"
+    volumes:
+      - sedrad:/app/data/
+    command: sedrad --utxoindex --connect=kdxweb.sedracalc.net
+
+volumes:
+  postgresql:
+  sedrad:
